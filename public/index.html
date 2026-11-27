@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ecosfera · Chat Musical & Estudio RAG</title>
+  <meta name="description" content="Ecosfera: plataforma musical con App Chat dinámico, Interfaz App RAG en SQLite y reproducción integrada desde YouTube.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <script>
+    (function () {
+      try {
+        var saved = localStorage.getItem("ecosfera-theme");
+        var theme = saved === "light" || saved === "dark" ? saved : "dark";
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (_err) {
+        document.documentElement.setAttribute("data-theme", "dark");
+      }
+    })();
+  </script>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Saltar al contenido principal</a>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="brand-block">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 28 28" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.6">
+            <circle cx="14" cy="14" r="11"></circle>
+            <circle cx="14" cy="14" r="6.8" stroke-opacity="0.65"></circle>
+            <circle cx="14" cy="14" r="2.2"></circle>
+            <path d="M14 3v2.6M14 22.4V25M3 14h2.6M22.4 14H25" stroke-linecap="round"></path>
+          </svg>
+        </span>
+        <div class="brand-copy">
+          <h1 class="brand-title">Ecosfera</h1>
+          <p class="brand-subtitle">Estudio musical semántico en SQLite · Chat + RAG + YouTube</p>
+        </div>
+      </div>
+
+      <nav class="view-nav" aria-label="Funcionalidades principales">
+        <button
+          type="button"
+          id="nav-chat-btn"
+          class="nav-pill-btn"
+          data-view="chat"
+          aria-current="page"
+        >
+          App Chat
+        </button>
+        <button
+          type="button"
+          id="nav-studio-btn"
+          class="nav-pill-btn"
+          data-view="studio"
+          aria-current="false"
+        >
+          Interfaz App
+        </button>
+      </nav>
+
+      <div class="header-controls">
+        <div class="status-cluster" aria-live="polite">
+          <div id="health-pill" class="health-pill" data-state="loading">
+            <span class="status-dot" aria-hidden="true"></span>
+            <span id="health-vectors" class="mono-stat">SQLite · —</span>
+            <span class="pill-divider" aria-hidden="true">·</span>
+            <span id="health-models" class="health-models">Cargando…</span>
+          </div>
+          <button
+            type="button"
+            id="sync-vectors-btn"
+            class="btn-secondary btn-compact"
+            disabled
+          >
+            Sincronizar
+          </button>
+        </div>
+
+        <button
+          type="button"
+          id="theme-toggle"
+          class="theme-toggle"
+          aria-pressed="true"
+          aria-label="Cambiar a modo día"
+        >
+          <span class="theme-icon theme-icon-moon" aria-hidden="true">
+            <svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M16.5 12.2A6.8 6.8 0 0 1 7.8 3.5a6.8 6.8 0 1 0 8.7 8.7Z"></path>
+            </svg>
+          </span>
+          <span class="theme-icon theme-icon-sun" aria-hidden="true">
+            <svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+              <circle cx="10" cy="10" r="3.4"></circle>
+              <path d="M10 2.2v1.6M10 16.2v1.6M2.2 10h1.6M16.2 10h1.6M4.5 4.5l1.1 1.1M14.4 14.4l1.1 1.1M15.5 4.5l-1.1 1.1M5.6 14.4l-1.1 1.1"></path>
+            </svg>
+          </span>
+          <span id="theme-toggle-label">Modo día</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main-content">
+    <!-- FUNCIONALIDAD 1: APP CHAT -->
+    <section id="view-chat" class="chat-layout" aria-labelledby="chat-heading">
+      <div class="panel panel-edge chat-panel">
+        <div class="panel-header">
+          <div>
+            <h2 id="chat-heading" class="panel-title">App Chat Musical</h2>
+            <p class="panel-caption">Preguntas y respuestas dinámicas fundamentadas en las fichas y las 27 músicas de SQLite.</p>
+          </div>
+          <div class="chat-header-actions">
+            <span id="chat-opt-badge" class="mono-badge" aria-live="polite">Caché activa</span>
+            <button type="button" id="chat-clear-btn" class="btn-secondary btn-compact">
+              Limpiar chat
+            </button>
+          </div>
+        </div>
+
+        <div id="chat-messages" class="chat-thread" aria-live="polite"></div>
+
+        <form id="chat-form" class="chat-composer" novalidate>
+          <div class="examples-list" role="group" aria-label="Sugerencias rápidas de chat">
+            <button type="button" class="example-chip chat-chip" data-message="¿Qué canciones de Rafa Espino o Luani tienes en el catálogo?">
+              Canciones de Rafa Espino / Luani
+            </button>
+            <button type="button" class="example-chip chat-chip" data-message="Recomiéndame música electrónica como Avicii o Daft Punk">
+              Electrónica y Daft Punk
+            </button>
+            <button type="button" class="example-chip chat-chip" data-message="¿Cómo funciona el círculo de quintas en armonía?">
+              Círculo de quintas
+            </button>
+          </div>
+
+          <div class="field-label-row">
+            <label for="chat-input" class="field-label">Tu pregunta sobre música o canciones</label>
+            <span id="chat-char-count" class="mono-stat">0/400</span>
+          </div>
+
+          <div class="chat-input-row">
+            <textarea
+              id="chat-input"
+              name="message"
+              rows="2"
+              maxlength="400"
+              required
+              placeholder="Ej. ¿Qué temas de Emo Rap o Reguetón hay para reproducir?"
+            ></textarea>
+            <button type="submit" id="chat-submit" class="btn-primary">
+              Enviar
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <aside id="chat-music-dock" class="panel music-dock" aria-labelledby="chat-dock-heading">
+        <div class="panel-header">
+          <div>
+            <h3 id="chat-dock-heading" class="panel-title">Músicas &amp; Reproductor YouTube</h3>
+            <p class="panel-caption">Integrado en App Chat: reproduce o filtra por género e idioma.</p>
+          </div>
+          <button type="button" id="chat-yt-stop-btn" class="btn-secondary btn-compact" hidden>
+            Detener
+          </button>
+        </div>
+
+        <div id="chat-yt-empty" class="yt-player-empty">
+          <p>Pulsa <strong>Play</strong> en una canción sugerida por el chat o en la lista de abajo.</p>
+        </div>
+
+        <div id="chat-yt-frame-wrap" class="yt-aspect" hidden>
+          <iframe
+            id="chat-yt-iframe"
+            title="Reproductor YouTube en App Chat"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            referrerpolicy="strict-origin-when-cross-origin"
+            allowfullscreen
+          ></iframe>
+        </div>
+
+        <div id="chat-yt-now" class="yt-now-playing" hidden aria-live="polite">
+          <div class="yt-now-info">
+            <strong id="chat-yt-title" class="yt-active-title"></strong>
+            <span id="chat-yt-meta" class="yt-active-meta"></span>
+          </div>
+          <a
+            id="chat-yt-link"
+            class="btn-secondary btn-compact yt-external-link"
+            href="#"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            YouTube
+          </a>
+        </div>
+
+        <div class="dock-filters">
+          <div id="chat-lang-filter" class="pill-group" role="group" aria-label="Filtrar idioma en dock">
+            <button type="button" class="filter-pill is-active" data-language="">Todos</button>
+            <button type="button" class="filter-pill" data-language="es">Español</button>
+            <button type="button" class="filter-pill" data-language="en">Inglés</button>
+            <button type="button" class="filter-pill" data-language="instrumental">Instrumental</button>
+          </div>
+          <div id="chat-genre-pills" class="pill-group" role="group" aria-label="Filtrar género en dock"></div>
+          <input id="chat-track-search" type="search" placeholder="Filtrar título, artista o género…">
+        </div>
+
+        <ul id="chat-tracks-list" class="dock-tracks-list"></ul>
+
+        <details class="dock-details">
+          <summary>Agregar nueva música a SQLite</summary>
+          <form id="chat-add-track-form" class="add-doc-form" novalidate>
+            <div class="field-group">
+              <label for="chat-track-title" class="field-label">Título</label>
+              <input id="chat-track-title" type="text" required placeholder="Ej. Persiana Americana">
+            </div>
+            <div class="field-row">
+              <div class="field-group">
+                <label for="chat-track-artist" class="field-label">Artista</label>
+                <input id="chat-track-artist" type="text" required placeholder="Ej. Soda Stereo">
+              </div>
+              <div class="field-group">
+                <label for="chat-track-genre" class="field-label">Género</label>
+                <input id="chat-track-genre" type="text" list="genre-suggestions" required placeholder="Ej. Rock">
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field-group">
+                <label for="chat-track-lang" class="field-label">Idioma</label>
+                <select id="chat-track-lang">
+                  <option value="es">Español</option>
+                  <option value="en">Inglés</option>
+                  <option value="instrumental">Instrumental</option>
+                </select>
+              </div>
+              <div class="field-group">
+                <label for="chat-track-year" class="field-label">Año</label>
+                <input id="chat-track-year" type="number" min="1700" max="2100" placeholder="2024">
+              </div>
+            </div>
+            <div class="field-group">
+              <label for="chat-track-yt" class="field-label">Enlace o ID de YouTube</label>
+              <input id="chat-track-yt" type="text" required placeholder="https://www.youtube.com/watch?v=...">
+            </div>
+            <div class="field-group">
+              <label for="chat-track-notes" class="field-label">Notas</label>
+              <input id="chat-track-notes" type="text" placeholder="Instrumentación o estilo">
+            </div>
+            <div class="form-footer">
+              <button type="submit" id="chat-add-track-submit" class="btn-primary btn-compact">
+                Guardar y vectorizar
+              </button>
+              <span id="chat-add-track-feedback" class="form-feedback" aria-live="polite"></span>
+            </div>
+          </form>
+        </details>
+      </aside>
+    </section>
+
+    <!-- FUNCIONALIDAD 2: INTERFAZ APP (ESTUDIO RAG + MÚSICA INTEGRADA) -->
+    <section id="view-studio" class="workspace-grid" hidden aria-labelledby="query-heading">
+      <div class="primary-column">
+        <section class="panel panel-edge query-panel" aria-labelledby="query-heading">
+          <div class="panel-header">
+            <div>
+              <h2 id="query-heading" class="panel-title">Interfaz App · Consola RAG</h2>
+              <p class="panel-caption">Inspección vectorial completa sobre conocimiento teórico y catálogo musical SQLite.</p>
+            </div>
+          </div>
+
+          <form id="query-form" class="query-form" novalidate>
+            <div class="field-group">
+              <div class="field-label-row">
+                <label for="query-input" class="field-label">Consulta técnica o musical</label>
+                <span id="query-char-count" class="mono-stat">0/400</span>
+              </div>
+              <textarea
+                id="query-input"
+                name="question"
+                rows="3"
+                maxlength="400"
+                required
+                placeholder="Ej. ¿Diferencia entre síntesis sustractiva y FM?"
+              ></textarea>
+            </div>
+
+            <div class="query-actions-row">
+              <div class="topk-control">
+                <label for="topk-select" class="field-label">Fichas a recuperar (Top-K)</label>
+                <select id="topk-select" name="topK">
+                  <option value="2">2 fichas</option>
+                  <option value="3" selected>3 fichas</option>
+                  <option value="4">4 fichas</option>
+                  <option value="5">5 fichas</option>
+                </select>
+              </div>
+
+              <button type="submit" id="query-submit" class="btn-primary">
+                Consultar archivo
+              </button>
+            </div>
+
+            <div class="examples-block">
+              <span class="examples-label" id="examples-label">Consultas de referencia</span>
+              <div class="examples-list" role="group" aria-labelledby="examples-label">
+                <button type="button" class="example-chip studio-chip" data-question="¿Qué organiza el círculo de quintas y las armaduras?">
+                  Círculo de quintas
+                </button>
+                <button type="button" class="example-chip studio-chip" data-question="Diferencia entre síntesis sustractiva y FM">
+                  Síntesis sustractiva vs FM
+                </button>
+                <button type="button" class="example-chip studio-chip" data-question="¿Qué canciones de Emo Rap o BoyWithUke están registradas?">
+                  Emo Rap y BoyWithUke
+                </button>
+              </div>
+            </div>
+          </form>
+        </section>
+
+        <section class="panel pipeline-panel" aria-labelledby="pipeline-heading">
+          <div class="panel-header pipeline-header">
+            <div>
+              <h2 id="pipeline-heading" class="panel-title">Recorrido del flujo RAG</h2>
+              <p class="panel-caption">Trazabilidad y optimización de caché desde el embedding hasta la síntesis.</p>
+            </div>
+            <span id="pipeline-total-latency" class="mono-badge" aria-live="polite">— ms</span>
+          </div>
+
+          <ol id="pipeline-steps" class="pipeline-steps">
+            <li class="pipeline-step" data-step="embed_query" data-status="idle">
+              <div class="step-top">
+                <span class="step-index">01</span>
+                <span class="step-status-badge">En espera</span>
+              </div>
+              <h3 class="step-title">Consulta → Embedding</h3>
+              <p class="step-detail">Vectoriza o reutiliza caché LRU.</p>
+              <div class="step-footer"><span class="step-duration">—</span></div>
+            </li>
+
+            <li class="pipeline-step" data-step="sqlite_scan" data-status="idle">
+              <div class="step-top">
+                <span class="step-index">02</span>
+                <span class="step-status-badge">En espera</span>
+              </div>
+              <h3 class="step-title">Escaneo SQLite</h3>
+              <p class="step-detail">Lee fichas y canciones vectorizadas.</p>
+              <div class="step-footer"><span class="step-duration">—</span></div>
+            </li>
+
+            <li class="pipeline-step" data-step="cosine_rank" data-status="idle">
+              <div class="step-top">
+                <span class="step-index">03</span>
+                <span class="step-status-badge">En espera</span>
+              </div>
+              <h3 class="step-title">Ranking Top-K</h3>
+              <p class="step-detail">Filtra coincidencias sobre umbral.</p>
+              <div class="step-footer"><span class="step-duration">—</span></div>
+            </li>
+
+            <li class="pipeline-step" data-step="llm_synthesis" data-status="idle">
+              <div class="step-top">
+                <span class="step-index">04</span>
+                <span class="step-status-badge">En espera</span>
+              </div>
+              <h3 class="step-title">Síntesis IA</h3>
+              <p class="step-detail">Genera respuesta compacta en tokens.</p>
+              <div class="step-footer"><span class="step-duration">—</span></div>
+            </li>
+          </ol>
+        </section>
+
+        <section id="result-section" class="panel result-panel" aria-labelledby="result-heading" aria-live="polite">
+          <div class="panel-header">
+            <div>
+              <h2 id="result-heading" class="panel-title">Resultado e inspección vectorial</h2>
+              <p class="panel-caption">Respuesta fundamentada, ahorro de tokens, huella del vector y coincidencias.</p>
+            </div>
+          </div>
+
+          <div id="result-placeholder" class="empty-state">
+            <p>Envía una consulta para observar la proyección vectorial, métricas de tokens y coincidencias musicales.</p>
+          </div>
+
+          <div id="result-error" class="inline-alert" hidden role="alert"></div>
+
+          <div id="result-content" class="result-content" hidden>
+            <article class="answer-card">
+              <div class="answer-meta">
+                <span id="grounded-badge" class="status-badge">Fundamentada</span>
+                <div class="answer-meta-metrics">
+                  <span id="result-optimization" class="mono-stat">0 tok</span>
+                  <span id="result-latency" class="mono-stat">— ms</span>
+                </div>
+              </div>
+              <div id="answer-body" class="answer-body"></div>
+            </article>
+
+            <div class="footprint-card">
+              <div class="footprint-header">
+                <div>
+                  <h3 class="subsection-title">Huella del vector de consulta</h3>
+                  <p class="subsection-note">Primeras 32 dimensiones normalizadas (eje central 0)</p>
+                </div>
+                <div class="footprint-metrics">
+                  <span id="vector-dims" class="mono-stat">— dim</span>
+                  <span id="vector-norm" class="mono-stat">norma —</span>
+                </div>
+              </div>
+              <div id="vector-visualizer" class="vector-visualizer" role="img" aria-label="Representación en barras del vector de consulta"></div>
+            </div>
+
+            <div id="studio-tracks-match-block" class="matches-block" hidden>
+              <div class="matches-header">
+                <h3 class="subsection-title">Músicas coincidentes (YouTube)</h3>
+                <span id="studio-tracks-match-count" class="mono-stat">0 pistas</span>
+              </div>
+              <div id="studio-tracks-match-list" class="chat-track-strip"></div>
+            </div>
+
+            <div id="matches-block" class="matches-block" hidden>
+              <div class="matches-header">
+                <h3 class="subsection-title">Coincidencias recuperadas de SQLite</h3>
+                <span id="matches-count" class="mono-stat">0 fichas</span>
+              </div>
+              <ol id="matches-list" class="matches-list"></ol>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <aside class="sidebar-column" aria-label="Catálogo SQLite y reproductor integrado">
+        <section class="panel studio-music-panel" aria-labelledby="studio-music-heading">
+          <div class="panel-header">
+            <div>
+              <h2 id="studio-music-heading" class="panel-title">Catálogo musical integrado</h2>
+              <p class="panel-caption">27 pistas iniciales en Español, Inglés e Instrumental con reproductor YouTube.</p>
+            </div>
+            <button type="button" id="studio-yt-stop-btn" class="btn-secondary btn-compact" hidden>
+              Detener
+            </button>
+          </div>
+
+          <div id="studio-yt-empty" class="yt-player-empty">
+            <p>Pulsa <strong>Play</strong> en cualquier canción para reproducir desde YouTube aquí mismo.</p>
+          </div>
+
+          <div id="studio-yt-frame-wrap" class="yt-aspect" hidden>
+            <iframe
+              id="studio-yt-iframe"
+              title="Reproductor YouTube en Interfaz App"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              referrerpolicy="strict-origin-when-cross-origin"
+              allowfullscreen
+            ></iframe>
+          </div>
+
+          <div id="studio-yt-now" class="yt-now-playing" hidden aria-live="polite">
+            <div class="yt-now-info">
+              <strong id="studio-yt-title" class="yt-active-title"></strong>
+              <span id="studio-yt-meta" class="yt-active-meta"></span>
+            </div>
+            <a
+              id="studio-yt-link"
+              class="btn-secondary btn-compact yt-external-link"
+              href="#"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              YouTube
+            </a>
+          </div>
+
+          <div class="dock-filters" style="margin-top: 0.75rem;">
+            <div id="studio-lang-filter" class="pill-group" role="group" aria-label="Filtrar idioma">
+              <button type="button" class="filter-pill is-active" data-language="">Todos</button>
+              <button type="button" class="filter-pill" data-language="es">Español</button>
+              <button type="button" class="filter-pill" data-language="en">Inglés</button>
+              <button type="button" class="filter-pill" data-language="instrumental">Instrumental</button>
+            </div>
+            <div id="studio-genre-pills" class="pill-group" role="group" aria-label="Filtrar género"></div>
+            <input id="studio-track-search" type="search" placeholder="Buscar canción, artista o género…">
+          </div>
+
+          <div id="studio-music-status" class="status-note" aria-live="polite"></div>
+          <ul id="studio-tracks-list" class="dock-tracks-list" style="margin-top: 0.6rem;"></ul>
+
+          <details class="dock-details" style="margin-top: 0.75rem;">
+            <summary>Agregar nueva música a SQLite</summary>
+            <form id="add-track-form" class="add-doc-form" novalidate>
+              <div class="field-group">
+                <label for="track-title" class="field-label">Título</label>
+                <input id="track-title" name="title" type="text" required placeholder="Ej. Persiana Americana">
+              </div>
+              <div class="field-row">
+                <div class="field-group">
+                  <label for="track-artist" class="field-label">Artista</label>
+                  <input id="track-artist" name="artist" type="text" required placeholder="Ej. Soda Stereo">
+                </div>
+                <div class="field-group">
+                  <label for="track-genre" class="field-label">Género</label>
+                  <input id="track-genre" name="genre" type="text" list="genre-suggestions" required placeholder="Ej. Rock">
+                  <datalist id="genre-suggestions"></datalist>
+                </div>
+              </div>
+              <div class="field-row">
+                <div class="field-group">
+                  <label for="track-language" class="field-label">Idioma</label>
+                  <select id="track-language" name="language" required>
+                    <option value="es">Español</option>
+                    <option value="en">Inglés</option>
+                    <option value="instrumental">Instrumental</option>
+                  </select>
+                </div>
+                <div class="field-group">
+                  <label for="track-year" class="field-label">Año</label>
+                  <input id="track-year" name="releaseYear" type="number" min="1700" max="2100" placeholder="2024">
+                </div>
+              </div>
+              <div class="field-group">
+                <label for="track-youtube" class="field-label">Enlace o ID de YouTube</label>
+                <input id="track-youtube" name="youtubeUrl" type="text" required placeholder="https://www.youtube.com/watch?v=...">
+              </div>
+              <div class="field-group">
+                <label for="track-notes" class="field-label">Notas musicales</label>
+                <textarea id="track-notes" name="notes" rows="2" placeholder="Detalles sobre instrumentación o estilo."></textarea>
+              </div>
+              <div class="form-footer">
+                <button type="submit" id="add-track-submit" class="btn-primary btn-compact">
+                  Guardar y vectorizar
+                </button>
+                <span id="add-track-feedback" class="form-feedback" aria-live="polite"></span>
+              </div>
+            </form>
+          </details>
+        </section>
+
+        <section class="panel catalog-panel" aria-labelledby="catalog-heading">
+          <div class="panel-header">
+            <div>
+              <h2 id="catalog-heading" class="panel-title">Fichas de conocimiento</h2>
+              <p class="panel-caption">Base teórica indexada en SQLite.</p>
+            </div>
+            <span id="catalog-count" class="mono-badge">0 fichas</span>
+          </div>
+
+          <div class="catalog-toolbar">
+            <label for="category-filter" class="field-label">Categoría</label>
+            <select id="category-filter" aria-label="Filtrar fichas por categoría">
+              <option value="">Todas las categorías</option>
+            </select>
+          </div>
+
+          <div id="catalog-status" class="status-note" aria-live="polite"></div>
+          <ul id="documents-list" class="documents-list"></ul>
+        </section>
+
+        <section class="panel add-doc-panel" aria-labelledby="add-doc-heading">
+          <div class="panel-header">
+            <div>
+              <h2 id="add-doc-heading" class="panel-title">Agregar ficha técnica</h2>
+              <p class="panel-caption">Guarda conocimiento musical y genera su embedding.</p>
+            </div>
+          </div>
+
+          <form id="add-doc-form" class="add-doc-form" novalidate>
+            <div class="field-group">
+              <label for="doc-title" class="field-label">Título</label>
+              <input id="doc-title" name="title" type="text" required placeholder="Ej. Compresión paralela">
+            </div>
+            <div class="field-row">
+              <div class="field-group">
+                <label for="doc-category" class="field-label">Categoría</label>
+                <input id="doc-category" name="category" type="text" list="category-suggestions" required placeholder="Ej. Mezcla">
+                <datalist id="category-suggestions"></datalist>
+              </div>
+              <div class="field-group">
+                <label for="doc-tags" class="field-label">Etiquetas</label>
+                <input id="doc-tags" name="tags" type="text" placeholder="dinámica, bus">
+              </div>
+            </div>
+            <div class="field-group">
+              <label for="doc-content" class="field-label">Contenido técnico</label>
+              <textarea id="doc-content" name="content" rows="3" required placeholder="Describe el concepto musical con precisión."></textarea>
+            </div>
+            <div class="form-footer">
+              <button type="submit" id="add-doc-submit" class="btn-secondary">
+                Guardar y vectorizar
+              </button>
+              <span id="add-doc-feedback" class="form-feedback" aria-live="polite"></span>
+            </div>
+          </form>
+        </section>
+
+        <section class="panel history-panel" aria-labelledby="history-heading">
+          <div class="panel-header">
+            <div>
+              <h2 id="history-heading" class="panel-title">Historial reciente</h2>
+              <p class="panel-caption">Últimas consultas en <span class="mono-inline">query_logs</span>.</p>
+            </div>
+          </div>
+          <ul id="history-list" class="history-list"></ul>
+        </section>
+      </aside>
+    </section>
+  </main>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
