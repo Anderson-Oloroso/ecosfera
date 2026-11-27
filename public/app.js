@@ -728,6 +728,28 @@ function renderInitialChatGreeting() {
   });
 }
 
+function appendInlineFormatted(parentEl, rawText) {
+  const text = String(rawText || "");
+  const lines = text.split("\n");
+
+  lines.forEach((line, lineIndex) => {
+    if (lineIndex > 0) {
+      parentEl.appendChild(document.createElement("br"));
+    }
+    const parts = line.split(/(\*\*[^*\n]+?\*\*)/g);
+    parts.forEach((part) => {
+      if (!part) return;
+      if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
+        const strong = document.createElement("strong");
+        strong.textContent = part.slice(2, -2);
+        parentEl.appendChild(strong);
+      } else {
+        parentEl.appendChild(document.createTextNode(part));
+      }
+    });
+  });
+}
+
 function appendChatBubble({ role, text, metaText, tracks = [], grounded = false }) {
   const article = document.createElement("article");
   article.className = "chat-bubble";
@@ -748,7 +770,11 @@ function appendChatBubble({ role, text, metaText, tracks = [], grounded = false 
 
   const body = document.createElement("p");
   body.className = "chat-bubble-text";
-  body.textContent = text;
+  if (role === "assistant") {
+    appendInlineFormatted(body, text);
+  } else {
+    body.textContent = text;
+  }
 
   article.append(meta, body);
 
@@ -955,7 +981,7 @@ function renderAnswerText(container, answerText) {
 
   (paragraphs.length > 0 ? paragraphs : [safeText]).forEach((paragraph) => {
     const p = document.createElement("p");
-    p.textContent = paragraph;
+    appendInlineFormatted(p, paragraph);
     container.appendChild(p);
   });
 }

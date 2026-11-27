@@ -618,6 +618,12 @@ select:focus {
   color: var(--text-primary);
 }
 
+.chat-bubble-text strong,
+.answer-body strong {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
 .chat-bubble-text {
   margin: 0;
   font-size: 0.93rem;
