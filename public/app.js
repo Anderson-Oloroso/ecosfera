@@ -728,25 +728,94 @@ function renderInitialChatGreeting() {
   });
 }
 
-function appendInlineFormatted(parentEl, rawText) {
-  const text = String(rawText || "");
-  const lines = text.split("\n");
+const INLINE_MD_REGEX =
+  /(\*\*\*[^*\n]+?\*\*\*|\*\*[^*\n]+?\*\*|__[^_\n]+?__|\*[^*\s][^*\n]*?[^*\s]\*|\*[^*\s]\*|`[^`\n]+?`)/g;
 
-  lines.forEach((line, lineIndex) => {
-    if (lineIndex > 0) {
-      parentEl.appendChild(document.createElement("br"));
+function appendInlineTokens(parentEl, lineText) {
+  const parts = String(lineText || "").split(INLINE_MD_REGEX);
+  parts.forEach((part) => {
+    if (!part) return;
+
+    if (part.startsWith("***") && part.endsWith("***") && part.length > 6) {
+      const strong = document.createElement("strong");
+      const em = document.createElement("em");
+      em.textContent = part.slice(3, -3);
+      strong.appendChild(em);
+      parentEl.appendChild(strong);
+    } else if (
+      ((part.startsWith("**") && part.endsWith("**")) ||
+        (part.startsWith("__") && part.endsWith("__"))) &&
+      part.length > 4
+    ) {
+      const strong = document.createElement("strong");
+      strong.textContent = part.slice(2, -2);
+      parentEl.appendChild(strong);
+    } else if (part.startsWith("*") && part.endsWith("*") && part.length > 2) {
+      const em = document.createElement("em");
+      em.textContent = part.slice(1, -1);
+      parentEl.appendChild(em);
+    } else if (part.startsWith("`") && part.endsWith("`") && part.length > 2) {
+      const code = document.createElement("code");
+      code.textContent = part.slice(1, -1);
+      parentEl.appendChild(code);
+    } else {
+      parentEl.appendChild(document.createTextNode(part));
     }
-    const parts = line.split(/(\*\*[^*\n]+?\*\*)/g);
-    parts.forEach((part) => {
-      if (!part) return;
-      if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
-        const strong = document.createElement("strong");
-        strong.textContent = part.slice(2, -2);
-        parentEl.appendChild(strong);
-      } else {
-        parentEl.appendChild(document.createTextNode(part));
+  });
+}
+
+function renderFormattedMarkdown(container, rawText) {
+  container.replaceChildren();
+  const lines = String(rawText || "").replace(/\r\n/g, "\n").split("\n");
+
+  let activeList = null;
+  let activeListType = null;
+  let activeParagraph = null;
+
+  const flushParagraph = () => {
+    activeParagraph = null;
+  };
+
+  const flushList = () => {
+    activeList = null;
+    activeListType = null;
+  };
+
+  lines.forEach((rawLine) => {
+    const line = rawLine.trimEnd();
+    const trimmed = line.trim();
+
+    if (!trimmed) {
+      flushParagraph();
+      flushList();
+      return;
+    }
+
+    const bulletMatch = trimmed.match(/^(?:[-*•])\s+(.+)$/);
+    const orderedMatch = trimmed.match(/^\d+\.\s+(.+)$/);
+
+    if (bulletMatch || orderedMatch) {
+      flushParagraph();
+      const targetType = bulletMatch ? "ul" : "ol";
+      if (!activeList || activeListType !== targetType) {
+        activeList = document.createElement(targetType);
+        activeListType = targetType;
+        container.appendChild(activeList);
       }
-    });
+      const li = document.createElement("li");
+      appendInlineTokens(li, bulletMatch ? bulletMatch[1] : orderedMatch[1]);
+      activeList.appendChild(li);
+      return;
+    }
+
+    flushList();
+    if (!activeParagraph) {
+      activeParagraph = document.createElement("p");
+      container.appendChild(activeParagraph);
+    } else {
+      activeParagraph.appendChild(document.createElement("br"));
+    }
+    appendInlineTokens(activeParagraph, trimmed);
   });
 }
 
@@ -768,12 +837,14 @@ function appendChatBubble({ role, text, metaText, tracks = [], grounded = false 
 
   meta.append(who, rightMeta);
 
-  const body = document.createElement("p");
+  const body = document.createElement("div");
   body.className = "chat-bubble-text";
   if (role === "assistant") {
-    appendInlineFormatted(body, text);
+    renderFormattedMarkdown(body, text);
   } else {
-    body.textContent = text;
+    const p = document.createElement("p");
+    p.textContent = text;
+    body.appendChild(p);
   }
 
   article.append(meta, body);
@@ -975,15 +1046,7 @@ function markPipelineError(message) {
 }
 
 function renderAnswerText(container, answerText) {
-  container.replaceChildren();
-  const safeText = String(answerText || "Sin respuesta generada.");
-  const paragraphs = safeText.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
-
-  (paragraphs.length > 0 ? paragraphs : [safeText]).forEach((paragraph) => {
-    const p = document.createElement("p");
-    appendInlineFormatted(p, paragraph);
-    container.appendChild(p);
-  });
+  renderFormattedMarkdown(container, answerText || "Sin respuesta generada.");
 }
 
 function renderVectorVisualizer(queryEmbedding) {
