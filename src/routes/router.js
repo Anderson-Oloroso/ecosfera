@@ -173,11 +173,17 @@ async function serveStaticFile(req, res, pathname, publicDir) {
   const contentType = MIME_TYPES[ext] || "application/octet-stream";
   const content = await fs.readFile(resolvedFile);
 
-  res.writeHead(200, {
+  const headers = {
     "Content-Type": contentType,
     "Content-Length": content.length,
     "X-Content-Type-Options": "nosniff",
-  });
+  };
+
+  if (ext === ".html" || ext === ".js" || ext === ".css") {
+    headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
+  }
+
+  res.writeHead(200, headers);
 
   if (req.method === "HEAD") {
     res.end();
